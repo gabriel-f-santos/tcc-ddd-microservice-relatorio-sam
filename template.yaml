@@ -1,0 +1,72 @@
+# template.yaml - Relatório Service
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Relatório Service - Reports Management Microservice'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    Default: dev123456
+    Description: Database password
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        LOG_LEVEL: INFO
+
+Resources:
+  # === REPORTS FUNCTIONS ===
+  
+  GetRelatoriosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: handlers.relatorio_handler.get_relatorios_handler
+      Description: Get reports - TODO endpoint
+      Events:
+        GetRelatorios:
+          Type: Api
+          Properties:
+            Path: /reports
+            Method: GET
+
+  # === UTILITY FUNCTIONS ===
+
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: handlers.relatorio_handler.health_check_handler
+      Description: Health check endpoint
+      Events:
+        HealthCheck:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: GET
+
+Outputs:
+  RelatorioApiUrl:
+    Description: "API Gateway endpoint URL for Relatório service"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    Export:
+      Name: !Sub "${Environment}-relatorio-api-url"
+
+  # Export function names for monitoring
+  GetRelatoriosFunctionName:
+    Description: "Get Relatórios Function Name"
+    Value: !Ref GetRelatoriosFunction
+    Export:
+      Name: !Sub "${Environment}-get-relatorios-function"
