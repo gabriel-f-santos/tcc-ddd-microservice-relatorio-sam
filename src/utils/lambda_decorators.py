@@ -87,62 +87,52 @@ def with_database(func: Callable) -> Callable:
     return wrapper
 
 
-def with_auth(func: Callable) -> Callable:
+
+def require_auth(permissions: Optional[List[str]] = None):
     """
-    Extrai user_info do requestContext.authorizer e injeta em kwargs.
+    Substitui @with_auth + @require_permission(...).
+    Se permissions for None ou vazio, só exige que o usuário esteja autenticado.
+    Caso contrário, também checa cada permissão na lista.
     """
-    @functools.wraps(func)
-    async def wrapper(event: Dict[str, Any], context: Any, *args, **kwargs):
-        # path through API Gateway Lambda Authorizer
-        auth_ctx = (
-            (event.get("requestContext") or {})
-            .get("authorizer")
-            or {}
-        )
-
-        user_id = auth_ctx.get("userId")
-        if not user_id:
-            raise LambdaException(401, "Unauthorized")
-
-        # montando user_info
-        permissions_raw = auth_ctx.get("permissoes", "")
-        permissions = permissions_raw.split(",") if permissions_raw else []
-
-        user_info = {
-            "userId": user_id,
-            "email": auth_ctx.get("email"),
-            "permissoes": permissions,
-        }
-
-        kwargs["user_info"] = user_info
-
-        try:
-            return await func(event, context, *args, **kwargs)
-        except LambdaException:
-            raise
-        except Exception as e:
-            logger.error("Auth wrapper error", error=str(e))
-            raise LambdaException(500, "Authentication error")
-
-    return wrapper
-
-
-def require_permission(permission: str):
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            user_info = kwargs.get("user_info")
-            if not user_info:
-                raise LambdaException(401, "Authentication required")
+        async def wrapper(event: Dict[str, Any], context: Any, *args, **kwargs):
+            # 1) extrai user_info do requestContext.authorizer
+            auth_ctx = (event.get("requestContext") or {}).get("authorizer") or {}
+            user_id = auth_ctx.get("userId")
+            if not user_id:
+                raise LambdaException(401, "Unauthorized")
 
-            user_perms = user_info.get("permissoes", [])
-            if permission not in user_perms and "admin:*" not in user_perms:
-                raise LambdaException(403, f"Permission required: {permission}")
+            # monta o user_info
+            perms_raw = auth_ctx.get("permissoes", "")
+            perms = perms_raw.split(",") if perms_raw else []
+            user_info = {
+                "userId": user_id,
+                "email": auth_ctx.get("email"),
+                "permissoes": perms,
+            }
+            kwargs["user_info"] = user_info
 
-            return await func(*args, **kwargs)
+            # 2) checa permissões, se fornecidas
+            if permissions:
+                allowed = False
+                for req in permissions:
+                    if req in perms or "admin:*" in perms:
+                        allowed = True
+                        break
+                if not allowed:
+                    raise LambdaException(403, f"Permission required: {permissions}")
+
+            # 3) chama a função original
+            try:
+                return await func(event, context, *args, **kwargs)
+            except LambdaException:
+                raise
+            except Exception as e:
+                logger.error("Auth wrapper error", error=str(e))
+                raise LambdaException(500, "Authentication error")
 
         return wrapper
-
     return decorator
 
 
