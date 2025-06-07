@@ -16,19 +16,6 @@ Parameters:
     Description: Database password
 
 Globals:
-  # Protege todas as rotas com o Lambda Authorizer, exceto health
-  Api:
-    Auth:
-      DefaultAuthorizer: LambdaAuth
-      AddDefaultAuthorizerToCorsPreflight: false
-      Authorizers:
-        LambdaAuth:
-          FunctionArn: !ImportValue
-            Fn::Sub: 'AuthFunctionArn'
-          Identity:
-            Header: Authorization
-            ValidationExpression: '^TOKEN .+$'
-
   Function:
     Runtime: python3.13
     Timeout: 30
@@ -37,10 +24,29 @@ Globals:
       Variables:
         ENVIRONMENT: !Ref Environment
         LOG_LEVEL: INFO
+    Tags:
+      Service: relatorio    # tag aplicada a todas as Lambdas
 
 Resources:
+  # API Gateway explícito para suportar DefaultAuthorizer
+  RelatorioApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: LambdaAuth
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          LambdaAuth:
+            FunctionArn: !ImportValue
+              Fn::Sub: 'AuthFunctionArn'
+            Identity:
+              Header: Authorization
+
+      Tags:
+        Service: relatorio   # tag aplicada ao API Gateway
+
   # === REPORTS FUNCTIONS ===
-  
   GetRelatoriosFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -51,11 +57,11 @@ Resources:
         GetRelatorios:
           Type: Api
           Properties:
+            RestApiId: !Ref RelatorioApi
             Path: /reports
             Method: GET
 
-  # === UTILITY FUNCTIONS ===
-
+  # === HEALTH CHECK (público) ===
   HealthCheckFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -66,6 +72,7 @@ Resources:
         HealthCheck:
           Type: Api
           Properties:
+            RestApiId: !Ref RelatorioApi
             Path: /health
             Method: GET
             Auth:
@@ -74,7 +81,7 @@ Resources:
 Outputs:
   RelatorioApiUrl:
     Description: "API Gateway endpoint URL for Relatório service"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    Value: !Sub "https://${RelatorioApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
     Export:
       Name: !Sub "${Environment}-relatorio-api-url"
 
