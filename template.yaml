@@ -1,4 +1,3 @@
-# template.yaml - Relatório Service
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'Relatório Service - Reports Management Microservice'
@@ -17,6 +16,19 @@ Parameters:
     Description: Database password
 
 Globals:
+  # Protege todas as rotas com o Lambda Authorizer, exceto health
+  Api:
+    Auth:
+      DefaultAuthorizer: LambdaAuth
+      AddDefaultAuthorizerToCorsPreflight: false
+      Authorizers:
+        LambdaAuth:
+          FunctionArn: !ImportValue
+            Fn::Sub: 'AuthFunctionArn'
+          Identity:
+            Header: Authorization
+            ValidationExpression: '^TOKEN .+$'
+
   Function:
     Runtime: python3.13
     Timeout: 30
@@ -34,7 +46,7 @@ Resources:
     Properties:
       CodeUri: .
       Handler: handlers.relatorio_handler.get_relatorios_handler
-      Description: Get reports - TODO endpoint
+      Description: Get reports
       Events:
         GetRelatorios:
           Type: Api
@@ -56,6 +68,8 @@ Resources:
           Properties:
             Path: /health
             Method: GET
+            Auth:
+              Authorizer: NONE
 
 Outputs:
   RelatorioApiUrl:
@@ -64,7 +78,6 @@ Outputs:
     Export:
       Name: !Sub "${Environment}-relatorio-api-url"
 
-  # Export function names for monitoring
   GetRelatoriosFunctionName:
     Description: "Get Relatórios Function Name"
     Value: !Ref GetRelatoriosFunction
