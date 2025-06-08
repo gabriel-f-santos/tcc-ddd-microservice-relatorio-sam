@@ -31,6 +31,12 @@ Globals:
         DATABASE_URL: !Ref DatabaseUrlParameter
     Tags:
       Service: relatorio    # tag aplicada a todas as Lambdas
+    VpcConfig:
+      SecurityGroupIds:
+        - sg-0023175edfd49ca18
+      SubnetIds:
+        - subnet-0f12951fa6cccef8e #privada
+        - subnet-0d9dc74d2a9c8c4f6 #privada
 
 Resources:
   # API Gateway explícito para suportar DefaultAuthorizer
@@ -88,10 +94,10 @@ Outputs:
     Description: "API Gateway endpoint URL for Relatório service"
     Value: !Sub "https://${RelatorioApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
     Export:
-      Name: !Sub "${Environment}-relatorio-api-url"
+      Name: "relatorio-api-url"
 
   GetRelatoriosFunctionName:
     Description: "Get Relatórios Function Name"
     Value: !Ref GetRelatoriosFunction
     Export:
-      Name: !Sub "${Environment}-get-relatorios-function"
+      Name: "get-relatorios-function"

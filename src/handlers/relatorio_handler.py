@@ -6,7 +6,7 @@ from datetime import datetime
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from utils.lambda_decorators import (
+from src.utils.lambda_decorators import (
     lambda_handler,
     with_database,
     require_auth,
